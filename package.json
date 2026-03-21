@@ -128,5 +128,13 @@
                             "@vscode/vsce":  "^2.22.0",
                             "esbuild":  "^0.20.0",
                             "typescript":  "^5.3.0"
-                        }
+                        },
+    "repository":  {
+                       "type":  "git",
+                       "url":  "https://github.com/im-coderavi/MasterPrompt-ai.git"
+                   },
+    "homepage":  "https://github.com/im-coderavi/MasterPrompt-ai#readme",
+    "bugs":  {
+                 "url":  "https://github.com/im-coderavi/MasterPrompt-ai/issues"
+             }
 }
