@@ -1,0 +1,128 @@
+{
+    "name":  "promptmaster-ai",
+    "displayName":  "PromptMaster AI - Your Senior Prompt Engineer",
+    "description":  "Transform any vague prompt into a precise, surgical AI instruction. Works with Copilot, ChatGPT, Cursor, Gemini, Claude - any AI tool.",
+    "version":  "1.0.0",
+    "publisher":  "avishekgiri",
+    "engines":  {
+                    "vscode":  "^1.75.0"
+                },
+    "categories":  [
+                       "AI",
+                       "Other"
+                   ],
+    "keywords":  [
+                     "prompt",
+                     "ai",
+                     "copilot",
+                     "chatgpt",
+                     "gemini",
+                     "prompt engineering"
+                 ],
+    "activationEvents":  [
+                             "onStartupFinished"
+                         ],
+    "main":  "./dist/extension.js",
+    "icon":  "media/icon.png",
+    "contributes":  {
+                        "viewsContainers":  {
+                                                "activitybar":  [
+                                                                    {
+                                                                        "id":  "promptmaster",
+                                                                        "title":  "PromptMaster AI",
+                                                                        "icon":  "$(robot)"
+                                                                    }
+                                                                ]
+                                            },
+                        "views":  {
+                                      "promptmaster":  [
+                                                           {
+                                                               "type":  "webview",
+                                                               "id":  "promptmaster.sidebar",
+                                                               "name":  "PromptMaster AI"
+                                                           }
+                                                       ]
+                                  },
+                        "commands":  [
+                                         {
+                                             "command":  "promptmaster.openPanel",
+                                             "title":  "PromptMaster: Open Panel"
+                                         },
+                                         {
+                                             "command":  "promptmaster.tagSelection",
+                                             "title":  "PromptMaster: Tag Selection"
+                                         },
+                                         {
+                                             "command":  "promptmaster.removeTag",
+                                             "title":  "PromptMaster: Remove Tag"
+                                         },
+                                         {
+                                             "command":  "promptmaster.enhanceCurrentPrompt",
+                                             "title":  "PromptMaster: Enhance Current Prompt"
+                                         },
+                                         {
+                                             "command":  "promptmaster.openSettings",
+                                             "title":  "PromptMaster: Open Settings"
+                                         },
+                                         {
+                                             "command":  "promptmaster.toggleSmartMode",
+                                             "title":  "PromptMaster: Toggle Smart Mode"
+                                         },
+                                         {
+                                             "command":  "promptmaster.copyLastPrompt",
+                                             "title":  "PromptMaster: Copy Last Enhanced Prompt"
+                                         },
+                                         {
+                                             "command":  "promptmaster.clearHistory",
+                                             "title":  "PromptMaster: Clear Prompt History"
+                                         },
+                                         {
+                                             "command":  "promptmaster.enhanceSelection",
+                                             "title":  "Enhance Selection as Prompt"
+                                         }
+                                     ],
+                        "menus":  {
+                                      "editor/context":  [
+                                                             {
+                                                                 "command":  "promptmaster.tagSelection",
+                                                                 "when":  "editorHasSelection",
+                                                                 "group":  "promptmaster@1"
+                                                             },
+                                                             {
+                                                                 "command":  "promptmaster.enhanceSelection",
+                                                                 "when":  "editorHasSelection",
+                                                                 "group":  "promptmaster@2"
+                                                             }
+                                                         ]
+                                  },
+                        "keybindings":  [
+                                            {
+                                                "command":  "promptmaster.openPanel",
+                                                "key":  "ctrl+alt+p"
+                                            },
+                                            {
+                                                "command":  "promptmaster.tagSelection",
+                                                "key":  "ctrl+alt+t",
+                                                "when":  "editorTextFocus \u0026\u0026 editorHasSelection"
+                                            },
+                                            {
+                                                "command":  "promptmaster.enhanceCurrentPrompt",
+                                                "key":  "ctrl+alt+e",
+                                                "when":  "editorTextFocus"
+                                            }
+                                        ]
+                    },
+    "scripts":  {
+                    "compile":  "node esbuild.js",
+                    "watch":  "node esbuild.js --watch",
+                    "package":  "vsce package",
+                    "vscode:prepublish":  "node esbuild.js --production"
+                },
+    "devDependencies":  {
+                            "@types/node":  "^25.5.0",
+                            "@types/vscode":  "^1.75.0",
+                            "@vscode/vsce":  "^2.22.0",
+                            "esbuild":  "^0.20.0",
+                            "typescript":  "^5.3.0"
+                        }
+}

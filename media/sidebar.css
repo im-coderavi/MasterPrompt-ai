@@ -1,0 +1,536 @@
+/* PromptMaster AI — Sidebar Styles */
+/* Uses VS Code CSS variables for perfect theme integration */
+
+:root {
+  --pm-blue: #89b4fa;
+  --pm-green: #a6e3a1;
+  --pm-orange: #fab387;
+  --pm-red: #f38ba8;
+  --pm-white: #cdd6f4;
+  --pm-purple: #cba6f7;
+  --pm-surface: var(--vscode-sideBar-background, #1e1e2e);
+  --pm-border: var(--vscode-panel-border, #45475a);
+  --pm-text: var(--vscode-foreground, #cdd6f4);
+  --pm-text-muted: var(--vscode-descriptionForeground, #a6adc8);
+  --pm-input-bg: var(--vscode-input-background, #313244);
+  --pm-input-border: var(--vscode-input-border, #45475a);
+  --pm-input-fg: var(--vscode-input-foreground, #cdd6f4);
+  --pm-btn-bg: var(--vscode-button-background, #89b4fa);
+  --pm-btn-fg: var(--vscode-button-foreground, #1e1e2e);
+  --pm-btn-hover: var(--vscode-button-hoverBackground, #74c7ec);
+  --pm-focus: var(--vscode-focusBorder, #89b4fa);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--pm-text);
+  background: var(--pm-surface);
+  padding: 0;
+  line-height: 1.5;
+}
+
+/* ===================== Tab Bar ===================== */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--pm-border);
+  background: var(--pm-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--pm-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.tab-btn:hover {
+  color: var(--pm-text);
+  background: rgba(137, 180, 250, 0.05);
+}
+
+.tab-btn.active {
+  color: var(--pm-blue);
+  border-bottom-color: var(--pm-blue);
+}
+
+/* ===================== Tab Content ===================== */
+.tab-content {
+  display: none;
+  padding: 12px;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ===================== Form Elements ===================== */
+.section {
+  margin-bottom: 12px;
+}
+
+.label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.select,
+.input,
+.textarea {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--pm-input-bg);
+  border: 1px solid var(--pm-input-border);
+  color: var(--pm-input-fg);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.select:focus,
+.input:focus,
+.textarea:focus {
+  border-color: var(--pm-focus);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+}
+
+/* ===================== Buttons ===================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--pm-btn-bg);
+  color: var(--pm-btn-fg);
+  font-weight: 600;
+  padding: 8px 16px;
+}
+
+.btn-primary:hover {
+  background: var(--pm-btn-hover);
+}
+
+.btn-secondary {
+  background: var(--pm-input-bg);
+  color: var(--pm-text);
+  border: 1px solid var(--pm-border);
+}
+
+.btn-secondary:hover {
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.btn-copy {
+  background: rgba(166, 227, 161, 0.15);
+  color: var(--pm-green);
+  border: 1px solid rgba(166, 227, 161, 0.3);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.btn-copy:hover {
+  background: rgba(166, 227, 161, 0.25);
+}
+
+.btn-danger {
+  background: rgba(243, 139, 168, 0.15);
+  color: var(--pm-red);
+  border: 1px solid rgba(243, 139, 168, 0.3);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.btn-danger:hover {
+  background: rgba(243, 139, 168, 0.25);
+}
+
+.btn-small {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--pm-input-bg);
+  color: var(--pm-text);
+  border: 1px solid var(--pm-border);
+  margin-top: 4px;
+}
+
+.btn-small:hover {
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.btn-icon {
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--pm-text-muted);
+  border: 1px solid var(--pm-border);
+  font-size: 13px;
+}
+
+.btn-spinner { display: none; }
+.btn.loading .btn-text { display: none; }
+.btn.loading .btn-spinner { display: inline; }
+
+.hidden { display: none !important; }
+
+/* ===================== Output Section ===================== */
+.output-section {
+  margin-top: 12px;
+  border: 1px solid var(--pm-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(137, 180, 250, 0.05);
+  border-bottom: 1px solid var(--pm-border);
+}
+
+.output-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.output-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-mode {
+  background: rgba(203, 166, 247, 0.2);
+  color: var(--pm-purple);
+}
+
+.badge-source {
+  background: rgba(137, 180, 250, 0.2);
+  color: var(--pm-blue);
+}
+
+.badge-source.smart {
+  background: rgba(166, 227, 161, 0.2);
+  color: var(--pm-green);
+}
+
+.enhanced-output {
+  padding: 10px;
+  font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Color-coded prompt sections */
+.prompt-section-context {
+  color: var(--pm-blue);
+}
+
+.prompt-section-task {
+  color: var(--pm-green);
+}
+
+.prompt-section-code {
+  color: var(--pm-orange);
+}
+
+.prompt-section-scope {
+  color: var(--pm-red);
+}
+
+.prompt-section-output {
+  color: var(--pm-white);
+}
+
+.prompt-section-label {
+  font-weight: 700;
+  display: block;
+  margin-top: 8px;
+}
+
+.prompt-section-label:first-child {
+  margin-top: 0;
+}
+
+.output-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-top: 1px solid var(--pm-border);
+  background: rgba(137, 180, 250, 0.03);
+}
+
+.char-count {
+  font-size: 10px;
+  color: var(--pm-text-muted);
+}
+
+/* ===================== Tag Mode ===================== */
+.tag-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(137, 180, 250, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(137, 180, 250, 0.2);
+  margin-bottom: 12px;
+}
+
+.tag-icon {
+  font-size: 24px;
+}
+
+.tag-filename {
+  font-weight: 600;
+  color: var(--pm-blue);
+  font-size: 13px;
+}
+
+.tag-lines {
+  font-size: 11px;
+  color: var(--pm-text-muted);
+}
+
+.code-preview {
+  background: var(--pm-input-bg);
+  border: 1px solid var(--pm-border);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--pm-text);
+}
+
+/* ===================== Empty State ===================== */
+.empty-state {
+  text-align: center;
+  padding: 40px 16px;
+  color: var(--pm-text-muted);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  margin-bottom: 8px;
+}
+
+.empty-hint {
+  font-size: 11px;
+  color: var(--pm-text-muted);
+}
+
+.empty-hint code {
+  background: var(--pm-input-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+/* ===================== Settings ===================== */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--pm-input-bg);
+  border: 1px solid var(--pm-border);
+  border-radius: 20px;
+  transition: 0.3s;
+}
+
+.toggle-slider:before {
+  content: '';
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--pm-text-muted);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.toggle input:checked + .toggle-slider {
+  background: rgba(166, 227, 161, 0.2);
+  border-color: var(--pm-green);
+}
+
+.toggle input:checked + .toggle-slider:before {
+  background: var(--pm-green);
+  transform: translateX(19px);
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--pm-text-muted);
+  margin-top: 4px;
+}
+
+.input-group {
+  display: flex;
+  gap: 4px;
+}
+
+.input-group .input {
+  flex: 1;
+}
+
+.key-status {
+  display: inline-block;
+  font-size: 11px;
+  margin-left: 8px;
+  color: var(--pm-green);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.settings-actions .btn {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+.test-result {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.test-result.success {
+  background: rgba(166, 227, 161, 0.1);
+  border: 1px solid rgba(166, 227, 161, 0.3);
+  color: var(--pm-green);
+}
+
+.test-result.error {
+  background: rgba(243, 139, 168, 0.1);
+  border: 1px solid rgba(243, 139, 168, 0.3);
+  color: var(--pm-red);
+}
+
+.links-list {
+  list-style: none;
+  padding: 0;
+}
+
+.links-list li {
+  margin-bottom: 6px;
+}
+
+.link {
+  color: var(--pm-blue);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* ===================== Scrollbar ===================== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pm-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pm-text-muted);
+}
