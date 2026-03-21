@@ -517,6 +517,70 @@ body {
   text-decoration: underline;
 }
 
+/* ===================== Smart Chat ===================== */
+.smart-chat-shell {
+  border: 1px solid var(--pm-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(137, 180, 250, 0.03);
+}
+
+.smart-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hint-inline {
+  font-size: 10px;
+  color: var(--pm-text-muted);
+}
+
+.smart-chat-log {
+  border: 1px solid var(--pm-border);
+  border-radius: 6px;
+  background: var(--pm-input-bg);
+  padding: 8px;
+  min-height: 90px;
+  max-height: 230px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.smart-msg {
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.smart-msg.user {
+  background: rgba(137, 180, 250, 0.14);
+  border: 1px solid rgba(137, 180, 250, 0.35);
+  color: var(--pm-blue);
+}
+
+.smart-msg.assistant {
+  background: rgba(166, 227, 161, 0.12);
+  border: 1px solid rgba(166, 227, 161, 0.35);
+  color: var(--pm-text);
+}
+
+.smart-msg.error {
+  background: rgba(243, 139, 168, 0.12);
+  border: 1px solid rgba(243, 139, 168, 0.35);
+  color: var(--pm-red);
+}
+
+.smart-chat-actions {
+  margin-top: 8px;
+}
+
 /* ===================== Scrollbar ===================== */
 ::-webkit-scrollbar {
   width: 6px;

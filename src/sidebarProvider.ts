@@ -98,6 +98,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         this.sendSmartModeStatus();
         await this.sendCurrentSettings();
         break;
+      case 'providerChanged':
+        await this.sendCurrentSettings(msg.provider);
+        break;
+      case 'smartChatEnhance':
+        await this.handleSmartChatEnhance(msg.prompt);
+        break;
     }
   }
 
@@ -149,6 +155,36 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
     await this.handleEnhance(rawPrompt, requestedMode);
+  }
+
+  private async handleSmartChatEnhance(rawPrompt: string): Promise<void> {
+    if (!rawPrompt?.trim()) {
+      this.postMessage({ command: 'smartChatError', message: 'Please type a prompt first.' });
+      return;
+    }
+
+    this.postMessage({ command: 'smartChatLoading', state: true });
+
+    try {
+      const provider = this.smartMode.getCurrentProvider();
+      const hasKey = await this.smartMode.hasApiKey(provider);
+
+      if (!hasKey) {
+        this.postMessage({
+          command: 'smartChatError',
+          message: `No API key saved for ${provider}. Please save your key in Smart Settings first.`,
+        });
+        return;
+      }
+
+      const context = await this.contextReader.read();
+      const result = await this.smartMode.enhance(rawPrompt, context);
+      this.postMessage({ command: 'smartChatResult', prompt: result, provider });
+    } catch (e: any) {
+      this.postMessage({ command: 'smartChatError', message: e.message || 'Smart enhancement failed.' });
+    } finally {
+      this.postMessage({ command: 'smartChatLoading', state: false });
+    }
   }
 
   openSettings(): void {
@@ -210,17 +246,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async sendCurrentSettings(): Promise<void> {
-    const provider = this.smartMode.getStatus().provider;
+  private async sendCurrentSettings(selectedProvider?: string): Promise<void> {
+    const provider = selectedProvider || this.smartMode.getStatus().provider;
     const hasKey = await this.smartMode.hasApiKey(provider);
+    const providerSettings = await this.smartMode.getProviderSettings(provider);
+
     this.postMessage({
       command: 'settingsLoaded',
       settings: {
         smartModeEnabled: this.smartMode.isEnabled,
         provider,
-        model: this.context.globalState.get<string>('promptmaster.model', DEFAULT_MODELS[provider] || ''),
-        customEndpoint: this.context.globalState.get<string>('promptmaster.customEndpoint', ''),
-        hasApiKey: hasKey,
+        model: providerSettings.model || DEFAULT_MODELS[provider] || '',
+        customEndpoint: providerSettings.customEndpoint,
+        hasApiKey: hasKey || providerSettings.hasApiKey,
       },
     });
   }
@@ -308,6 +346,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   </div>
 
   <div class="tab-content" id="tab-smart">
+    <div class="section smart-chat-shell">
+      <div class="smart-chat-header">
+        <label class="label">Smart Chat Prompt Enhancer</label>
+        <span class="hint-inline">Uses your saved provider key</span>
+      </div>
+      <div id="smart-chat-log" class="smart-chat-log"></div>
+      <textarea id="smart-chat-input" class="textarea" placeholder="Type any raw prompt. Smart Chat will convert it into a strong AI-ready prompt..." rows="5"></textarea>
+      <div class="smart-chat-actions">
+        <button id="smart-chat-send-btn" class="btn btn-primary">
+          <span class="btn-text">Enhance In Smart Chat</span>
+          <span class="btn-spinner hidden">Working...</span>
+        </button>
+      </div>
+    </div>
+
     <div class="section">
       <div class="toggle-row">
         <label class="label">Smart Mode</label>

@@ -2,8 +2,8 @@
     "name":  "promptmaster-ai",
     "displayName":  "PromptMaster AI - Your Senior Prompt Engineer",
     "description":  "Transform any vague prompt into a precise, surgical AI instruction. Works with Copilot, ChatGPT, Cursor, Gemini, Claude - any AI tool.",
-    "version":  "1.0.0",
-    "publisher":  "avishekgiri",
+    "version":  "1.0.1",
+    "publisher":  "AvishekGiri",
     "engines":  {
                     "vscode":  "^1.75.0"
                 },
@@ -23,6 +23,9 @@
                              "onStartupFinished"
                          ],
     "main":  "./dist/extension.js",
+    "bin":  {
+                "avishek":  "./dist/cli.js"
+            },
     "icon":  "media/icon.png",
     "contributes":  {
                         "viewsContainers":  {
@@ -116,6 +119,7 @@
                     "compile":  "node esbuild.js",
                     "watch":  "node esbuild.js --watch",
                     "package":  "vsce package",
+                    "build:cli":  "node esbuild.js --production",
                     "vscode:prepublish":  "node esbuild.js --production"
                 },
     "devDependencies":  {

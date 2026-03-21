@@ -35,6 +35,9 @@
   const testConnectionBtn = document.getElementById('test-connection-btn');
   const clearKeyBtn = document.getElementById('clear-key-btn');
   const testResult = document.getElementById('test-result');
+  const smartChatInput = document.getElementById('smart-chat-input');
+  const smartChatSendBtn = document.getElementById('smart-chat-send-btn');
+  const smartChatLog = document.getElementById('smart-chat-log');
 
   let lastEnhancedText = '';
 
@@ -126,7 +129,8 @@
     const provider = providerSelect.value;
     modelInput.placeholder = DEFAULT_MODELS[provider] || 'model name';
     customEndpointSection.classList.toggle('hidden', provider !== 'custom');
-    keyStatus.textContent = '';
+    keyStatus.textContent = 'Loading...';
+    vscode.postMessage({ command: 'providerChanged', provider });
   });
 
   toggleKeyVisibility.addEventListener('click', () => {
@@ -165,6 +169,29 @@
     apiKeyInput.value = '';
     keyStatus.textContent = '';
   });
+
+  smartChatSendBtn.addEventListener('click', () => {
+    const prompt = smartChatInput.value.trim();
+    if (!prompt) {
+      return;
+    }
+    appendSmartChatMessage('user', prompt);
+    vscode.postMessage({ command: 'smartChatEnhance', prompt });
+  });
+
+  smartChatInput.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      smartChatSendBtn.click();
+    }
+  });
+
+  function appendSmartChatMessage(role, text) {
+    const bubble = document.createElement('div');
+    bubble.className = 'smart-msg ' + role;
+    bubble.textContent = text;
+    smartChatLog.appendChild(bubble);
+    smartChatLog.scrollTop = smartChatLog.scrollHeight;
+  }
 
   window.addEventListener('message', event => {
     const msg = event.data;
@@ -215,7 +242,7 @@
         modelInput.placeholder = DEFAULT_MODELS[settings.provider] || 'model name';
         endpointInput.value = settings.customEndpoint || '';
         customEndpointSection.classList.toggle('hidden', settings.provider !== 'custom');
-        keyStatus.textContent = settings.hasApiKey ? 'Key saved' : '';
+        keyStatus.textContent = settings.hasApiKey ? 'Key saved for this provider' : 'No key saved for this provider';
         break;
       }
 
@@ -226,7 +253,7 @@
         break;
 
       case 'apiKeySaved':
-        keyStatus.textContent = 'Key saved';
+        keyStatus.textContent = 'Key saved for this provider';
         apiKeyInput.value = '';
         smartModeToggle.checked = true;
         break;
@@ -250,6 +277,20 @@
       case 'setPromptAndEnhance':
         rawPrompt.value = msg.prompt;
         vscode.postMessage({ command: 'enhance', rawPrompt: msg.prompt, mode: modeSelect.value });
+        break;
+
+      case 'smartChatLoading':
+        smartChatSendBtn.classList.toggle('loading', msg.state);
+        smartChatSendBtn.disabled = msg.state;
+        break;
+
+      case 'smartChatResult':
+        appendSmartChatMessage('assistant', msg.prompt);
+        smartChatInput.value = '';
+        break;
+
+      case 'smartChatError':
+        appendSmartChatMessage('error', msg.message);
         break;
     }
   });

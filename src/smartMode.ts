@@ -13,13 +13,30 @@ export class SmartMode {
     return this._isEnabled;
   }
 
-  async enhance(rawPrompt: string, vsContext: PromptContext): Promise<string> {
-    const provider = this.context.globalState.get<string>('promptmaster.provider', 'gemini');
-    const apiKey = await this.context.secrets.get(`promptmaster.apikey.${provider}`);
-    const model = this.context.globalState.get<string>(
-      'promptmaster.model',
-      DEFAULT_MODELS[provider] || ''
+  getCurrentProvider(): string {
+    return this.context.globalState.get<string>('promptmaster.provider', 'gemini');
+  }
+
+  getModelForProvider(provider: string): string {
+    const legacyModel = this.context.globalState.get<string>('promptmaster.model', '');
+    return this.context.globalState.get<string>(
+      `promptmaster.model.${provider}`,
+      legacyModel || DEFAULT_MODELS[provider] || ''
     );
+  }
+
+  getCustomEndpointForProvider(provider: string): string {
+    const legacyEndpoint = this.context.globalState.get<string>('promptmaster.customEndpoint', '');
+    return this.context.globalState.get<string>(
+      `promptmaster.customEndpoint.${provider}`,
+      legacyEndpoint
+    );
+  }
+
+  async enhance(rawPrompt: string, vsContext: PromptContext): Promise<string> {
+    const provider = this.getCurrentProvider();
+    const apiKey = await this.context.secrets.get(`promptmaster.apikey.${provider}`);
+    const model = this.getModelForProvider(provider);
 
     if (!apiKey) {
       throw new Error('No API key configured for ' + provider);
@@ -146,7 +163,7 @@ export class SmartMode {
   }
 
   private async callCustom(apiKey: string, model: string, system: string, user: string, signal: AbortSignal): Promise<string> {
-    const endpoint = this.context.globalState.get<string>('promptmaster.customEndpoint', '');
+    const endpoint = this.getCustomEndpointForProvider('custom');
     if (!endpoint) {
       throw new Error('Custom endpoint URL is not configured');
     }
@@ -179,17 +196,14 @@ export class SmartMode {
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
-    const provider = this.context.globalState.get<string>('promptmaster.provider', 'gemini');
+    const provider = this.getCurrentProvider();
     const apiKey = await this.context.secrets.get(`promptmaster.apikey.${provider}`);
 
     if (!apiKey) {
       return { success: false, message: `No API key configured for ${provider}` };
     }
 
-    const model = this.context.globalState.get<string>(
-      'promptmaster.model',
-      DEFAULT_MODELS[provider] || ''
-    );
+    const model = this.getModelForProvider(provider);
 
     try {
       const controller = new AbortController();
@@ -224,15 +238,15 @@ export class SmartMode {
   getStatus(): { enabled: boolean; provider: string } {
     return {
       enabled: this._isEnabled,
-      provider: this.context.globalState.get<string>('promptmaster.provider', 'gemini'),
+      provider: this.getCurrentProvider(),
     };
   }
 
   async saveSettings(provider: string, model: string, endpoint?: string): Promise<void> {
     await this.context.globalState.update('promptmaster.provider', provider);
-    await this.context.globalState.update('promptmaster.model', model);
+    await this.context.globalState.update(`promptmaster.model.${provider}`, model);
     if (endpoint !== undefined) {
-      await this.context.globalState.update('promptmaster.customEndpoint', endpoint);
+      await this.context.globalState.update(`promptmaster.customEndpoint.${provider}`, endpoint);
     }
   }
 
@@ -247,5 +261,13 @@ export class SmartMode {
   async hasApiKey(provider: string): Promise<boolean> {
     const key = await this.context.secrets.get(`promptmaster.apikey.${provider}`);
     return !!key;
+  }
+
+  async getProviderSettings(provider: string): Promise<{ model: string; customEndpoint: string; hasApiKey: boolean }> {
+    return {
+      model: this.getModelForProvider(provider),
+      customEndpoint: this.getCustomEndpointForProvider(provider),
+      hasApiKey: await this.hasApiKey(provider),
+    };
   }
 }
