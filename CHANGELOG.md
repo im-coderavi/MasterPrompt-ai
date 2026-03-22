@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.5] - 2026-03-22
+
+### Changed
+- Replaced the sidebar/activity icon with a sharper custom PromptMaster monogram for clearer visibility in the VS Code Activity Bar.
+
 ## [1.0.4] - 2026-03-22
 
 ### Fixed
