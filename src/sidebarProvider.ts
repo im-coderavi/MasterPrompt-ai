@@ -1,436 +1,424 @@
 import * as vscode from 'vscode';
-import type { TagManager } from './tagManager';
-import type { ContextReader } from './contextReader';
-import type { PromptEngine, Mode } from './promptEngine';
-import type { SmartMode } from './smartMode';
-import type { StatusBarManager } from './statusBar';
-import { DEFAULT_MODELS } from './constants';
+import { ApiService } from './apiService';
+import { enhancePrompt } from './localEnhancer';
+import { DEFAULT_MODELS, DEFAULT_SYSTEM_PROMPT, StorageService } from './storageService';
+import type {
+  AttachedFile,
+  ChatMessage,
+  ExtensionSettings,
+  SavedPrompt,
+  SettingsPayload,
+  SmartChatRequest,
+  ViewState,
+} from './types';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
-  private _view?: vscode.WebviewView;
-  private lastEnhancedPrompt: string = '';
+  public static readonly viewType = 'promptmasterSidebar';
+  private view?: vscode.WebviewView;
 
   constructor(
-    private context: vscode.ExtensionContext,
-    private tagManager: TagManager,
-    private contextReader: ContextReader,
-    private promptEngine: PromptEngine,
-    private smartMode: SmartMode,
-    private statusBar: StatusBarManager
+    private readonly context: vscode.ExtensionContext,
+    private readonly storage: StorageService,
+    private readonly apiService: ApiService,
   ) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
-    this._view = webviewView;
-
+    this.view = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')],
     };
-
     webviewView.webview.html = this.getHtml(webviewView.webview);
-
-    webviewView.webview.onDidReceiveMessage(async (msg) => {
-      await this.handleMessage(msg);
-    });
-
-    webviewView.onDidChangeVisibility(() => {
-      if (webviewView.visible) {
-        this.sendTagUpdate();
-        this.sendSmartModeStatus();
-      }
+    webviewView.webview.onDidReceiveMessage(async (message) => {
+      await this.handleMessage(message);
     });
   }
 
-  private async handleMessage(msg: any): Promise<void> {
-    switch (msg.command) {
-      case 'enhance':
-        await this.handleEnhance(msg.rawPrompt, msg.mode);
-        break;
-      case 'enhanceTag':
-        await this.handleEnhanceTag(msg.rawPrompt, msg.mode);
-        break;
-      case 'removeTag':
-        await this.tagManager.removeTag();
-        this.sendTagUpdate();
-        this.statusBar.update();
-        break;
-      case 'copyPrompt':
-        await vscode.env.clipboard.writeText(msg.text);
-        vscode.window.showInformationMessage('PromptMaster: Prompt copied to clipboard!');
-        break;
-      case 'ready':
-        this.sendTagUpdate();
-        this.sendSmartModeStatus();
-        await this.sendCurrentSettings();
-        break;
-      case 'saveApiKey':
-        await this.smartMode.saveSettings(
-          msg.provider,
-          msg.model || DEFAULT_MODELS[msg.provider] || '',
-          msg.endpoint
-        );
-        await this.smartMode.saveApiKey(msg.provider, msg.key);
-        await this.smartMode.setEnabled(true);
-        this.statusBar.update();
-        this.sendSmartModeStatus();
-        await this.sendCurrentSettings();
-        this.postMessage({ command: 'apiKeySaved', provider: msg.provider });
-        break;
-      case 'clearApiKey':
-        await this.smartMode.clearApiKey(msg.provider);
-        await this.sendCurrentSettings();
-        this.postMessage({ command: 'apiKeyCleared' });
-        break;
-      case 'saveSettings':
-        await this.smartMode.saveSettings(msg.provider, msg.model, msg.endpoint);
-        this.statusBar.update();
-        this.sendSmartModeStatus();
-        await this.sendCurrentSettings();
-        break;
-      case 'testConnection': {
-        const result = await this.smartMode.testConnection();
-        this.postMessage({ command: 'testResult', success: result.success, message: result.message });
-        break;
-      }
-      case 'toggleSmartMode':
-        await this.smartMode.setEnabled(!!msg.enabled);
-        this.statusBar.update();
-        this.sendSmartModeStatus();
-        await this.sendCurrentSettings();
-        break;
-      case 'providerChanged':
-        await this.sendCurrentSettings(msg.provider);
-        break;
-      case 'smartChatEnhance':
-        await this.handleSmartChatEnhance(msg.prompt);
-        break;
-    }
-  }
-
-  private async handleEnhance(rawPrompt: string, requestedMode: Mode | 'auto'): Promise<void> {
-    if (!rawPrompt.trim()) {
-      this.postMessage({ command: 'enhanceError', message: 'Please type a prompt first.' });
-      return;
-    }
-
-    this.postMessage({ command: 'loading', state: true });
-
-    try {
-      const context = await this.contextReader.read();
-      const mode = requestedMode === 'auto' ? this.promptEngine.detect(rawPrompt) : requestedMode;
-      let result: string;
-      let source: 'local' | 'smart' = 'local';
-
-      if (this.smartMode.isEnabled) {
-        try {
-          result = await this.smartMode.enhance(rawPrompt, context);
-          source = 'smart';
-        } catch (e: any) {
-          vscode.window.showWarningMessage(`PromptMaster: Smart Mode failed (${e.message}), using local engine.`);
-          result = this.promptEngine.enhance(rawPrompt, context, mode);
-        }
-      } else {
-        result = this.promptEngine.enhance(rawPrompt, context, mode);
-      }
-
-      this.lastEnhancedPrompt = result;
-      this.postMessage({
-        command: 'enhanceResult',
-        prompt: result,
-        mode,
-        source,
-        rawLength: rawPrompt.length,
-        enhancedLength: result.length,
-      });
-    } catch (e: any) {
-      this.postMessage({ command: 'enhanceError', message: e.message || 'Enhancement failed.' });
-    } finally {
-      this.postMessage({ command: 'loading', state: false });
-    }
-  }
-
-  private async handleEnhanceTag(rawPrompt: string, requestedMode: Mode | 'auto'): Promise<void> {
-    if (!rawPrompt.trim()) {
-      this.postMessage({ command: 'enhanceError', message: 'Please type a prompt for the tagged code.' });
-      return;
-    }
-    await this.handleEnhance(rawPrompt, requestedMode);
-  }
-
-  private async handleSmartChatEnhance(rawPrompt: string): Promise<void> {
-    if (!rawPrompt?.trim()) {
-      this.postMessage({ command: 'smartChatError', message: 'Please type a prompt first.' });
-      return;
-    }
-
-    this.postMessage({ command: 'smartChatLoading', state: true });
-
-    try {
-      const provider = this.smartMode.getCurrentProvider();
-      const hasKey = await this.smartMode.hasApiKey(provider);
-
-      if (!hasKey) {
-        this.postMessage({
-          command: 'smartChatError',
-          message: `No API key saved for ${provider}. Please save your key in Smart Settings first.`,
-        });
+  private async handleMessage(message: { command?: string; payload?: any }): Promise<void> {
+    switch (message.command) {
+      case 'loadSettings':
+        await this.postSettingsLoaded();
         return;
-      }
-
-      const context = await this.contextReader.read();
-      const result = await this.smartMode.enhance(rawPrompt, context);
-      this.postMessage({ command: 'smartChatResult', prompt: result, provider });
-    } catch (e: any) {
-      this.postMessage({ command: 'smartChatError', message: e.message || 'Smart enhancement failed.' });
-    } finally {
-      this.postMessage({ command: 'smartChatLoading', state: false });
+      case 'localEnhance':
+        await this.handleLocalEnhance(message.payload);
+        return;
+      case 'saveSettings':
+        await this.handleSaveSettings(message.payload);
+        return;
+      case 'testConnection':
+        await this.handleTestConnection();
+        return;
+      case 'clearApiKey':
+        await this.handleClearApiKey();
+        return;
+      case 'smartChat':
+        await this.handleSmartChat(message.payload as SmartChatRequest);
+        return;
+      case 'savePrompt':
+        await this.handleSavePrompt(message.payload);
+        return;
+      case 'deletePrompt':
+        await this.handleDeletePrompt(message.payload?.id);
+        return;
+      case 'clearSaved':
+        await this.storage.clearSavedPrompts();
+        await this.postSavedPrompts();
+        this.toast('success', 'Saved prompts cleared');
+        return;
+      case 'clearChatHistory':
+        await this.storage.clearChatHistory();
+        this.postMessage({ command: 'chatHistoryCleared', payload: {} });
+        this.toast('success', 'Chat history cleared');
+        return;
+      case 'applyCodeToFile':
+        await this.handleApplyCodeToFile(message.payload);
+        return;
+      case 'getActiveFileContent':
+        await this.handleGetActiveFileContent();
+        return;
+      case 'persistState':
+        await this.storage.saveViewState(message.payload as ViewState);
+        return;
+      case 'openExternal':
+        await this.handleOpenExternal(message.payload?.url);
+        return;
+      default:
+        return;
     }
   }
 
-  openSettings(): void {
-    if (this._view) {
-      this._view.show(true);
-      this.postMessage({ command: 'switchTab', tab: 'smart' });
-    }
-  }
-
-  async enhanceFromCommand(): Promise<void> {
-    if (!this._view) {
+  private async handleLocalEnhance(payload: { prompt?: string; variation?: number }): Promise<void> {
+    const prompt = payload?.prompt?.trim() ?? '';
+    if (!prompt) {
+      this.postMessage({ command: 'error', payload: { message: 'Please enter a prompt to enhance.' } });
       return;
     }
-    this._view.show(true);
-    this.postMessage({ command: 'triggerEnhance' });
-  }
 
-  async enhanceSelection(): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.selection.isEmpty) {
-      vscode.window.showWarningMessage('PromptMaster: Select text to use as a prompt.');
-      return;
-    }
-    const selectedText = editor.document.getText(editor.selection);
-    if (this._view) {
-      this._view.show(true);
-      this.postMessage({ command: 'setPromptAndEnhance', prompt: selectedText });
-    }
-  }
-
-  copyLastPrompt(): void {
-    if (this.lastEnhancedPrompt) {
-      vscode.env.clipboard.writeText(this.lastEnhancedPrompt);
-      vscode.window.showInformationMessage('PromptMaster: Last prompt copied!');
-    } else {
-      vscode.window.showWarningMessage('PromptMaster: No enhanced prompt to copy.');
-    }
-  }
-
-  private sendTagUpdate(): void {
-    const hasTag = this.tagManager.hasActiveTag();
-    const tagInfo = this.tagManager.getTagInfo();
-    const taggedCode = this.tagManager.getTaggedCode();
-    this.postMessage({
-      command: 'tagUpdate',
-      hasTag,
-      fileName: tagInfo?.fileName,
-      lines: tagInfo?.lines,
-      taggedCode,
+    const enhanced = enhancePrompt(prompt, { variation: payload?.variation });
+    const viewState = await this.storage.getViewState();
+    await this.storage.saveViewState({
+      ...viewState,
+      localDraft: prompt,
+      localResult: enhanced,
+      localVariation: payload?.variation ?? 0,
     });
-  }
-
-  private sendSmartModeStatus(): void {
-    const status = this.smartMode.getStatus();
-    this.postMessage({
-      command: 'smartModeStatus',
-      enabled: status.enabled,
-      provider: status.provider,
-    });
-  }
-
-  private async sendCurrentSettings(selectedProvider?: string): Promise<void> {
-    const provider = selectedProvider || this.smartMode.getStatus().provider;
-    const hasKey = await this.smartMode.hasApiKey(provider);
-    const providerSettings = await this.smartMode.getProviderSettings(provider);
 
     this.postMessage({
-      command: 'settingsLoaded',
-      settings: {
-        smartModeEnabled: this.smartMode.isEnabled,
-        provider,
-        model: providerSettings.model || DEFAULT_MODELS[provider] || '',
-        customEndpoint: providerSettings.customEndpoint,
-        hasApiKey: hasKey || providerSettings.hasApiKey,
+      command: 'localResult',
+      payload: {
+        text: enhanced,
+        variation: payload?.variation ?? 0,
       },
     });
   }
 
-  private postMessage(msg: any): void {
-    this._view?.webview.postMessage(msg);
+  private async handleSaveSettings(payload: Partial<ExtensionSettings> & { apiKey?: string }): Promise<void> {
+    const current = await this.storage.getSettings();
+    const next: ExtensionSettings = {
+      ...current,
+      ...payload,
+      api: { ...current.api, ...(payload.api ?? {}) },
+      behavior: { ...current.behavior, ...(payload.behavior ?? {}) },
+      chat: { ...current.chat, ...(payload.chat ?? {}) },
+      connectionStates: { ...current.connectionStates, ...(payload.connectionStates ?? {}) },
+    };
+
+    if (payload.api?.provider && !payload.api.model) {
+      next.api.model = DEFAULT_MODELS[payload.api.provider];
+    }
+
+    await this.storage.saveSettings(next);
+    if (typeof payload.apiKey === 'string' && payload.apiKey.trim()) {
+      await this.storage.setApiKey(next.api.provider, payload.apiKey.trim());
+    }
+
+    const viewState = await this.storage.getViewState();
+    await this.storage.saveViewState({
+      ...viewState,
+      smartModeEnabled: next.smartModeEnabled,
+    });
+
+    await this.postSettingsLoaded();
+    this.toast('success', 'Settings saved');
+  }
+
+  private async handleTestConnection(): Promise<void> {
+    const settings = await this.storage.getSettings();
+    const apiKey = await this.storage.getApiKey(settings.api.provider);
+    const result = await this.apiService.testConnection(settings, apiKey);
+
+    await this.storage.updateConnectionState(settings.api.provider, {
+      status: result.success ? 'verified' : apiKey || settings.api.provider === 'ollama' ? 'saved' : 'not_configured',
+      lastCheckedAt: new Date().toISOString(),
+      lastError: result.success ? undefined : result.message,
+      model: result.model,
+      latencyMs: result.latencyMs,
+    });
+
+    this.postMessage({ command: 'testResult', payload: result });
+    this.toast(result.success ? 'success' : 'error', result.success ? 'Connected!' : 'Failed - invalid key');
+    await this.postSettingsLoaded();
+  }
+
+  private async handleClearApiKey(): Promise<void> {
+    const settings = await this.storage.getSettings();
+    await this.storage.clearApiKey(settings.api.provider);
+    await this.postSettingsLoaded();
+    this.postMessage({ command: 'testResult', payload: { success: false, message: 'Key cleared.' } });
+    this.toast('success', 'Key cleared');
+  }
+
+  private async handleSmartChat(payload: SmartChatRequest): Promise<void> {
+    const settings = await this.storage.getSettings();
+    const provider = settings.api.provider;
+    const hasKey = provider === 'ollama' || (await this.storage.hasApiKey(provider));
+
+    if (!hasKey) {
+      await this.storage.savePartialSettings({ smartModeEnabled: false });
+      this.postMessage({
+        command: 'error',
+        payload: {
+          message: 'No API key saved. Go to Settings.',
+          smartModeDisabled: true,
+        },
+      });
+      await this.postSettingsLoaded();
+      return;
+    }
+
+    const apiKey = await this.storage.getApiKey(provider);
+    const userMessage: ChatMessage = {
+      id: this.id(),
+      role: 'user',
+      content: payload.userMessage,
+      timestamp: new Date().toISOString(),
+      provider,
+      attachedFile: payload.attachedFile,
+    };
+
+    const baseHistory = [...payload.history.filter((item) => item.id !== 'streaming'), userMessage];
+    await this.storage.saveChatHistory(baseHistory);
+
+    const streamId = this.id();
+    let responseText = '';
+    this.postMessage({ command: 'streamChunk', payload: { messageId: streamId, text: '', reset: true, provider } });
+
+    try {
+      await this.apiService.streamChat(
+        {
+          systemPrompt: settings.behavior.systemPromptOverride.trim() || DEFAULT_SYSTEM_PROMPT,
+          messages: this.buildConversationMessages(payload, settings),
+          settings,
+          apiKey,
+        },
+        {
+          onChunk: (chunk) => {
+            responseText += chunk;
+            this.postMessage({ command: 'streamChunk', payload: { messageId: streamId, text: chunk, provider } });
+          },
+        },
+      );
+
+      const assistantMessage: ChatMessage = {
+        id: streamId,
+        role: 'assistant',
+        content: responseText.trim(),
+        timestamp: new Date().toISOString(),
+        provider,
+        tokenUsage: this.estimateTokens(responseText),
+      };
+
+      await this.storage.saveChatHistory([...baseHistory, assistantMessage]);
+      this.postMessage({ command: 'streamEnd', payload: { message: assistantMessage } });
+      this.toast('success', 'Response ready');
+    } catch (error) {
+      this.postMessage({
+        command: 'error',
+        payload: {
+          message: error instanceof Error ? error.message : 'Smart Mode failed.',
+        },
+      });
+      this.postMessage({ command: 'streamEnd', payload: { message: undefined } });
+    }
+  }
+
+  private async handleSavePrompt(payload: { content?: string; provider?: SavedPrompt['provider']; id?: string }): Promise<void> {
+    const content = payload?.content?.trim() ?? '';
+    if (!content) {
+      return;
+    }
+
+    const prompts = await this.storage.upsertSavedPrompt({
+      id: payload?.id ?? this.id(),
+      content,
+      provider: payload?.provider ?? 'local',
+      timestamp: new Date().toISOString(),
+      preview: content.slice(0, 80),
+    });
+    this.postMessage({ command: 'savedPromptsUpdated', payload: { prompts } });
+    this.toast('success', 'Prompt saved');
+  }
+
+  private async handleDeletePrompt(id?: string): Promise<void> {
+    if (!id) {
+      return;
+    }
+    const prompts = await this.storage.deleteSavedPrompt(id);
+    this.postMessage({ command: 'savedPromptsUpdated', payload: { prompts } });
+    this.toast('success', 'Saved prompt deleted');
+  }
+
+  private async handleGetActiveFileContent(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      this.postMessage({ command: 'error', payload: { message: 'No active editor found.' } });
+      return;
+    }
+
+    const document = editor.document;
+    const attachedFile: AttachedFile = {
+      fileName: document.fileName.split(/[\\/]/).pop() ?? 'untitled',
+      filePath: document.uri.fsPath,
+      language: document.languageId,
+      content: document.getText(),
+    };
+
+    const viewState = await this.storage.getViewState();
+    await this.storage.saveViewState({
+      ...viewState,
+      attachedFile,
+    });
+
+    this.postMessage({ command: 'activeFileContent', payload: attachedFile });
+  }
+
+  private async handleApplyCodeToFile(payload: { code?: string; language?: string }): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      this.postMessage({ command: 'error', payload: { message: 'Open a file before applying code.' } });
+      return;
+    }
+
+    const document = editor.document;
+    const previewUri = vscode.Uri.from({
+      scheme: 'untitled',
+      path: `${document.uri.path}.promptmaster-preview.${payload?.language || document.languageId}`,
+    });
+    const previewDocument = await vscode.workspace.openTextDocument(previewUri);
+    const previewEdit = new vscode.WorkspaceEdit();
+    previewEdit.insert(previewUri, new vscode.Position(0, 0), payload?.code ?? '');
+    await vscode.workspace.applyEdit(previewEdit);
+
+    await vscode.commands.executeCommand('vscode.diff', document.uri, previewUri, 'PromptMaster AI Suggested Changes');
+
+    const decision = await vscode.window.showInformationMessage(
+      'Review the diff, then choose whether to apply the suggested code to the active file.',
+      'Apply Changes',
+      'Cancel',
+    );
+
+    if (decision !== 'Apply Changes') {
+      return;
+    }
+
+    const fullRange = new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, fullRange, payload?.code ?? '');
+    await vscode.workspace.applyEdit(edit);
+    await document.save();
+
+    this.postMessage({ command: 'codeApplied', payload: { filePath: document.uri.fsPath } });
+    this.toast('success', 'Code applied');
+  }
+
+  private async handleOpenExternal(url?: string): Promise<void> {
+    if (url) {
+      await vscode.env.openExternal(vscode.Uri.parse(url));
+    }
+  }
+
+  private buildConversationMessages(
+    payload: SmartChatRequest,
+    settings: ExtensionSettings,
+  ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+    const history = payload.history.slice(-12).map((message) => ({
+      role: message.role,
+      content: message.content,
+    })) as Array<{ role: 'user' | 'assistant'; content: string }>;
+
+    const extraContext: string[] = [
+      `Persona: ${settings.behavior.persona}`,
+      `Enhancement style: ${settings.behavior.enhancementStyle}`,
+    ];
+
+    if (settings.behavior.includeWorkspaceInfo) {
+      const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name ?? 'No workspace';
+      const activeLanguage = vscode.window.activeTextEditor?.document.languageId ?? 'unknown';
+      extraContext.push(`Workspace: ${workspaceName}`);
+      extraContext.push(`Active language: ${activeLanguage}`);
+    }
+
+    if (payload.attachedFile) {
+      extraContext.push(
+        `Attached file: ${payload.attachedFile.fileName} (${payload.attachedFile.language})\n${payload.attachedFile.content}`,
+      );
+    } else if (settings.behavior.autoAttachActiveFile && vscode.window.activeTextEditor) {
+      const document = vscode.window.activeTextEditor.document;
+      extraContext.push(
+        `Active file context: ${document.fileName.split(/[\\/]/).pop()} (${document.languageId})\n${document.getText()}`,
+      );
+    }
+
+    return [
+      { role: 'system', content: settings.behavior.systemPromptOverride.trim() || DEFAULT_SYSTEM_PROMPT },
+      ...history,
+      { role: 'user', content: `${payload.userMessage}\n\nAdditional context:\n${extraContext.join('\n')}` },
+    ];
+  }
+
+  private async postSettingsLoaded(): Promise<void> {
+    const payload: SettingsPayload = await this.storage.buildSettingsPayload(this.context.extension.packageJSON.version as string);
+    this.postMessage({ command: 'settingsLoaded', payload });
+  }
+
+  private async postSavedPrompts(): Promise<void> {
+    const prompts = await this.storage.getSavedPrompts();
+    this.postMessage({ command: 'savedPromptsUpdated', payload: { prompts } });
+  }
+
+  private toast(type: 'success' | 'error' | 'info', message: string): void {
+    this.postMessage({ command: 'toast', payload: { type, message } });
+  }
+
+  private postMessage(message: unknown): void {
+    void this.view?.webview.postMessage(message);
+  }
+
+  private estimateTokens(text: string): number {
+    return Math.max(1, Math.ceil(text.length / 4));
+  }
+
+  private id(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
   private getHtml(webview: vscode.Webview): string {
-    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'sidebar.css'));
-    const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'sidebar.js'));
-    const nonce = getNonce();
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'style.css'));
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'main.js'));
 
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <link rel="stylesheet" href="${cssUri}">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource}; connect-src https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com http://localhost:11434;">
+  <link rel="stylesheet" href="${styleUri}">
   <title>PromptMaster AI</title>
 </head>
 <body>
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="enhance">Enhance</button>
-    <button class="tab-btn" data-tab="smart">Smart Mode</button>
-  </div>
-
-  <div class="tab-content active" id="tab-enhance">
-    <div class="section">
-      <label class="label">Mode</label>
-      <select id="mode-select" class="select">
-        <option value="auto">Auto-detect</option>
-        <option value="bugfix">Bug Fix</option>
-        <option value="refactor">Refactor</option>
-        <option value="feature">Add Feature</option>
-        <option value="tests">Write Tests</option>
-        <option value="security">Security</option>
-        <option value="explain">Explain</option>
-        <option value="general">General</option>
-      </select>
-    </div>
-
-    <div class="section">
-      <label class="label">Your Prompt</label>
-      <textarea id="raw-prompt" class="textarea" placeholder="Describe what you want AI to do..." rows="4"></textarea>
-    </div>
-
-    <div id="tag-context-section" class="section hidden">
-      <div class="tag-info">
-        <span class="tag-icon">TAG</span>
-        <div>
-          <div class="tag-filename" id="tag-filename"></div>
-          <div class="tag-lines" id="tag-lines"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <label class="label">Tagged Code Context</label>
-        <pre id="tagged-code-preview" class="code-preview"></pre>
-      </div>
-
-      <button id="remove-tag-btn" class="btn btn-danger">Remove Tag</button>
-    </div>
-
-    <button id="enhance-btn" class="btn btn-primary">
-      <span class="btn-text">Enhance Prompt</span>
-      <span class="btn-spinner hidden">Enhancing...</span>
-    </button>
-
-    <div id="output-section" class="output-section hidden">
-      <div class="output-header">
-        <span class="output-title">Enhanced Prompt</span>
-        <div class="output-badges">
-          <span id="mode-badge" class="badge badge-mode"></span>
-          <span id="source-badge" class="badge badge-source"></span>
-        </div>
-      </div>
-      <div id="enhanced-output" class="enhanced-output"></div>
-      <div class="output-footer">
-        <span id="char-count" class="char-count"></span>
-        <button id="copy-btn" class="btn btn-copy">Copy Prompt</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="tab-content" id="tab-smart">
-    <div class="section smart-chat-shell">
-      <div class="smart-chat-header">
-        <label class="label">Smart Chat Prompt Enhancer</label>
-        <span class="hint-inline">Uses your saved provider key</span>
-      </div>
-      <div id="smart-chat-log" class="smart-chat-log"></div>
-      <textarea id="smart-chat-input" class="textarea" placeholder="Type any raw prompt. Smart Chat will convert it into a strong AI-ready prompt..." rows="5"></textarea>
-      <div class="smart-chat-actions">
-        <button id="smart-chat-send-btn" class="btn btn-primary">
-          <span class="btn-text">Enhance In Smart Chat</span>
-          <span class="btn-spinner hidden">Working...</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="toggle-row">
-        <label class="label">Smart Mode</label>
-        <label class="toggle">
-          <input type="checkbox" id="smart-mode-toggle">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <p class="hint">When enabled, PromptMaster uses your saved API key to enhance prompts with an AI provider.</p>
-    </div>
-
-    <div class="section">
-      <label class="label">AI Provider</label>
-      <select id="provider-select" class="select">
-        <option value="gemini">Google Gemini</option>
-        <option value="openai">OpenAI</option>
-        <option value="anthropic">Anthropic Claude</option>
-        <option value="custom">Custom (OpenAI-compatible)</option>
-      </select>
-    </div>
-
-    <div class="section">
-      <label class="label">API Key</label>
-      <div class="input-group">
-        <input type="password" id="api-key-input" class="input" placeholder="Enter your API key">
-        <button id="toggle-key-visibility" class="btn btn-icon" title="Show or hide key">Show</button>
-      </div>
-      <button id="save-key-btn" class="btn btn-small">Save Key</button>
-      <span id="key-status" class="key-status"></span>
-    </div>
-
-    <div class="section">
-      <label class="label">Model Name</label>
-      <input type="text" id="model-input" class="input" placeholder="e.g. gemini-2.0-flash">
-    </div>
-
-    <div class="section hidden" id="custom-endpoint-section">
-      <label class="label">Custom Endpoint URL</label>
-      <input type="text" id="endpoint-input" class="input" placeholder="https://your-api.com/v1/chat/completions">
-    </div>
-
-    <div class="settings-actions">
-      <button id="save-settings-btn" class="btn btn-primary">Save Settings</button>
-      <button id="test-connection-btn" class="btn btn-secondary">Test Connection</button>
-      <button id="clear-key-btn" class="btn btn-danger">Clear API Key</button>
-    </div>
-
-    <div id="test-result" class="test-result hidden"></div>
-
-    <div class="section" style="margin-top: 24px;">
-      <p class="hint"><strong>API key links:</strong></p>
-      <ul class="links-list">
-        <li><a href="https://aistudio.google.com/app/apikey" class="link">Google Gemini API Key</a></li>
-        <li><a href="https://platform.openai.com/api-keys" class="link">OpenAI API Key</a></li>
-        <li><a href="https://console.anthropic.com/settings/keys" class="link">Anthropic API Key</a></li>
-      </ul>
-    </div>
-  </div>
-
-  <script nonce="${nonce}" src="${jsUri}"></script>
+  <div id="app"></div>
+  <script src="${scriptUri}"></script>
 </body>
 </html>`;
   }
-}
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }

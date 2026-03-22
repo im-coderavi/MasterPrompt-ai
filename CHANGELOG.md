@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.2] - 2026-03-22
+
+### Added
+- Rebuilt the sidebar into a 2-tab Chat and Settings experience tailored for PromptMaster AI.
+- Added offline local enhancement mode with instant prompt rewriting, variations, and prompt handoff into Smart Mode.
+- Added streaming Smart Mode chat with markdown rendering, code-copy controls, file attachment, saved prompts, and apply-to-file flow.
+
+### Changed
+- Switched settings storage to a structured SecretStorage plus globalState service layer.
+- Updated extension activation, sidebar contribution, and VS Code engine support for the new webview architecture.
+
 ## [1.0.1] - 2026-03-22
 
 ### Fixed
