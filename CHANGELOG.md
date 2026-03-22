@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.3] - 2026-03-22
+
+### Fixed
+- Smart and Local modes now behave like a strict senior prompt engineer and focus on prompt enhancement first.
+- Prompt generation no longer adds code suggestions unless the user explicitly asks for coding help.
+- Active editor files are now detected automatically and passed in as prompt context in both local and smart flows.
+- Removed emoji-based UI labels and cleaned up text rendering across the sidebar.
+
+### Changed
+- Replaced the sidebar activity icon with a cleaner robotic icon.
+- Updated Smart Mode and default system prompts to enforce tighter scope, output control, and file-aware prompt rewriting.
+
 ## [1.0.2] - 2026-03-22
 
 ### Added

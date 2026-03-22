@@ -3,6 +3,7 @@ import { ApiService } from './apiService';
 import { enhancePrompt } from './localEnhancer';
 import { DEFAULT_MODELS, DEFAULT_SYSTEM_PROMPT, StorageService } from './storageService';
 import type {
+  ActiveEditorContext,
   AttachedFile,
   ChatMessage,
   ExtensionSettings,
@@ -94,13 +95,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const enhanced = enhancePrompt(prompt, { variation: payload?.variation });
+    const activeFile = this.getActiveEditorContext();
+    const enhanced = enhancePrompt(prompt, {
+      variation: payload?.variation,
+      activeFile,
+    });
     const viewState = await this.storage.getViewState();
     await this.storage.saveViewState({
       ...viewState,
       localDraft: prompt,
       localResult: enhanced,
       localVariation: payload?.variation ?? 0,
+      attachedFile: this.toAttachedFile(activeFile),
     });
 
     this.postMessage({
@@ -186,6 +192,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const activeFile = this.resolveAttachedFile(payload.attachedFile);
     const apiKey = await this.storage.getApiKey(provider);
     const userMessage: ChatMessage = {
       id: this.id(),
@@ -193,11 +200,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       content: payload.userMessage,
       timestamp: new Date().toISOString(),
       provider,
-      attachedFile: payload.attachedFile,
+      attachedFile: activeFile,
     };
 
     const baseHistory = [...payload.history.filter((item) => item.id !== 'streaming'), userMessage];
     await this.storage.saveChatHistory(baseHistory);
+    const viewState = await this.storage.getViewState();
+    await this.storage.saveViewState({
+      ...viewState,
+      smartDraft: '',
+      attachedFile: activeFile,
+    });
 
     const streamId = this.id();
     let responseText = '';
@@ -207,7 +220,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       await this.apiService.streamChat(
         {
           systemPrompt: settings.behavior.systemPromptOverride.trim() || DEFAULT_SYSTEM_PROMPT,
-          messages: this.buildConversationMessages(payload, settings),
+          messages: this.buildConversationMessages(payload, settings, activeFile),
           settings,
           apiKey,
         },
@@ -269,19 +282,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleGetActiveFileContent(): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
+    const activeFile = this.getActiveEditorContext();
+    if (!activeFile) {
       this.postMessage({ command: 'error', payload: { message: 'No active editor found.' } });
       return;
     }
 
-    const document = editor.document;
-    const attachedFile: AttachedFile = {
-      fileName: document.fileName.split(/[\\/]/).pop() ?? 'untitled',
-      filePath: document.uri.fsPath,
-      language: document.languageId,
-      content: document.getText(),
-    };
+    const attachedFile = this.toAttachedFile(activeFile);
 
     const viewState = await this.storage.getViewState();
     await this.storage.saveViewState({
@@ -340,6 +347,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private buildConversationMessages(
     payload: SmartChatRequest,
     settings: ExtensionSettings,
+    activeFile?: AttachedFile,
   ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
     const history = payload.history.slice(-12).map((message) => ({
       role: message.role,
@@ -358,14 +366,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       extraContext.push(`Active language: ${activeLanguage}`);
     }
 
-    if (payload.attachedFile) {
+    if (activeFile) {
       extraContext.push(
-        `Attached file: ${payload.attachedFile.fileName} (${payload.attachedFile.language})\n${payload.attachedFile.content}`,
-      );
-    } else if (settings.behavior.autoAttachActiveFile && vscode.window.activeTextEditor) {
-      const document = vscode.window.activeTextEditor.document;
-      extraContext.push(
-        `Active file context: ${document.fileName.split(/[\\/]/).pop()} (${document.languageId})\n${document.getText()}`,
+        `Active file: ${activeFile.fileName} (${activeFile.language})\nPath: ${activeFile.filePath}\n${activeFile.content}`,
       );
     }
 
@@ -400,6 +403,43 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private id(): string {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private getActiveEditorContext(): ActiveEditorContext | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return undefined;
+    }
+
+    const document = editor.document;
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    const relativePath = workspaceFolder
+      ? vscode.workspace.asRelativePath(document.uri, false)
+      : document.uri.fsPath;
+
+    return {
+      fileName: document.fileName.split(/[\\/]/).pop() ?? 'untitled',
+      relativePath,
+      language: document.languageId,
+      content: document.getText(),
+    };
+  }
+
+  private resolveAttachedFile(attachedFile?: AttachedFile): AttachedFile | undefined {
+    return attachedFile ?? this.toAttachedFile(this.getActiveEditorContext());
+  }
+
+  private toAttachedFile(activeFile?: ActiveEditorContext): AttachedFile | undefined {
+    if (!activeFile) {
+      return undefined;
+    }
+
+    return {
+      fileName: activeFile.fileName,
+      filePath: activeFile.relativePath,
+      language: activeFile.language,
+      content: activeFile.content,
+    };
   }
 
   private getHtml(webview: vscode.Webview): string {

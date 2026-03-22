@@ -1,5 +1,8 @@
+import type { ActiveEditorContext } from './types';
+
 export interface LocalEnhanceOptions {
   variation?: number;
+  activeFile?: ActiveEditorContext;
 }
 
 const VAGUE_WORDS: Array<[RegExp, string]> = [
@@ -12,9 +15,9 @@ const VAGUE_WORDS: Array<[RegExp, string]> = [
 ];
 
 const OUTPUT_VARIANTS = [
-  'Respond in structured markdown with examples.',
-  'Respond in structured markdown with a concise example and a checklist.',
-  'Respond in structured markdown with examples, edge cases, and implementation notes.',
+  'Return only the enhanced prompt as plain text.',
+  'Return only the enhanced prompt, structured for a coding assistant.',
+  'Return only the enhanced prompt, with crisp sections and no commentary.',
 ];
 
 const CONSTRAINT_VARIANTS = [
@@ -22,6 +25,8 @@ const CONSTRAINT_VARIANTS = [
   'Avoid vague guidance and make each recommendation concrete.',
   'Call out assumptions explicitly and keep the response practical.',
 ];
+
+const ACTIVE_FILE_CONTEXT_LIMIT = 1200;
 
 function normalizeWhitespace(input: string): string {
   return input.replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
@@ -64,21 +69,46 @@ function replaceVagueWords(prompt: string): string {
 function extractGoal(prompt: string): string {
   const firstLine = prompt.split('\n').find((line) => line.trim().length > 0) ?? prompt;
   return isQuestion(prompt)
-    ? `Complete the task implied by this question and produce a direct, useful answer: ${firstLine.trim()}`
-    : `Complete this task with high precision: ${firstLine.trim()}`;
+    ? `Rewrite this request into a precise prompt that helps the downstream AI answer it correctly: ${firstLine.trim()}`
+    : `Rewrite this request into a precise prompt that executes the intended task with high precision: ${firstLine.trim()}`;
+}
+
+function needsCodeOutput(prompt: string): boolean {
+  return /\b(code|snippet|implementation|function|component|query|sql|script|example code|working code)\b/i.test(prompt);
+}
+
+function buildFileContext(activeFile?: ActiveEditorContext): string[] {
+  if (!activeFile) {
+    return [];
+  }
+
+  const trimmedContent = normalizeWhitespace(activeFile.content).slice(0, ACTIVE_FILE_CONTEXT_LIMIT);
+
+  return [
+    'Active File Context:',
+    `- File: ${activeFile.fileName}`,
+    `- Path: ${activeFile.relativePath}`,
+    `- Language: ${activeFile.language}`,
+    '- Open file is part of the request context. Use it when relevant, but do not describe or modify unrelated code.',
+    trimmedContent ? `- Current file excerpt:\n${trimmedContent}` : '- Current file excerpt: unavailable',
+  ];
 }
 
 export function enhancePrompt(rawPrompt: string, options: LocalEnhanceOptions = {}): string {
   const cleaned = normalizeWhitespace(replaceVagueWords(rawPrompt));
   const domain = detectDomain(cleaned);
   const variation = Math.abs(options.variation ?? 0) % OUTPUT_VARIANTS.length;
-  const codeInstructions = containsCode(cleaned)
-    ? 'Include working code with comments. Explain each step.'
-    : 'Include concise examples where they improve clarity.';
+  const explicitCodeRequest = containsCode(cleaned) || needsCodeOutput(cleaned);
+  const codeInstructions = explicitCodeRequest
+    ? 'Allow code output only because the user explicitly asked for code, implementation help, or code review.'
+    : 'Do not ask the downstream AI to provide code, refactors, fixes, or implementation suggestions unless the user explicitly requests them.';
 
   const constraints = [
     CONSTRAINT_VARIANTS[variation],
-    'Think step by step before answering.',
+    'Preserve the user intent while removing ambiguity.',
+    'Use senior prompt engineering quality and concrete scope boundaries.',
+    'If the request is partly ambiguous, resolve it into the safest likely interpretation without changing the main goal.',
+    'Do not add new tasks, features, refactors, or debugging work that the user did not ask for.',
     OUTPUT_VARIANTS[variation],
     codeInstructions,
   ];
@@ -88,20 +118,22 @@ export function enhancePrompt(rawPrompt: string, options: LocalEnhanceOptions = 
     : cleaned;
 
   return [
-    `You are an expert in ${domain}.`,
+    `You are a senior prompt engineer specializing in ${domain}.`,
     '',
-    'Goal:',
+    'Task:',
     extractGoal(cleaned),
     '',
-    'Context:',
+    'User Request:',
     contextBlock,
     '',
+    ...buildFileContext(options.activeFile),
+    ...(options.activeFile ? [''] : []),
     'Constraints:',
     ...constraints.map((item) => `- ${item}`),
     '',
     'Output Format:',
-    '- Provide a structured markdown response.',
-    '- Use labeled sections and concrete recommendations.',
-    '- Include examples, sample outputs, or code where useful.',
+    '- Return only the improved prompt text.',
+    '- Write the prompt in professional English.',
+    '- Include objective, relevant context, strict boundaries, and expected output shape.',
   ].join('\n');
 }

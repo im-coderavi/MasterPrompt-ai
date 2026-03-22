@@ -84,6 +84,13 @@ export interface AttachedFile {
   content: string;
 }
 
+export interface ActiveEditorContext {
+  fileName: string;
+  relativePath: string;
+  language: string;
+  content: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';

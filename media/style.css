@@ -60,6 +60,7 @@ button {
 }
 
 .brand-row,
+.brand-lockup,
 .tabs,
 .composer-row,
 .button-row,
@@ -83,6 +84,29 @@ button {
 .brand {
   font-size: 15px;
   font-weight: 600;
+}
+
+.brand-lockup {
+  gap: 10px;
+}
+
+.brand-mark,
+.empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pm-accent);
+}
+
+.brand-mark {
+  width: 20px;
+  height: 20px;
+}
+
+.brand-mark svg,
+.empty-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .inline-warning,
@@ -388,9 +412,14 @@ textarea:focus {
 }
 
 .empty-icon {
-  font-size: 28px;
+  width: 36px;
+  height: 36px;
   margin-bottom: 8px;
-  color: var(--pm-accent);
+}
+
+.empty-note {
+  margin: 0 0 12px;
+  color: var(--pm-muted);
 }
 
 .settings-card .card-body {

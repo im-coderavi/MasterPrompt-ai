@@ -302,7 +302,7 @@ export class ApiService {
     const latency = Date.now() - started;
     return {
       success: true,
-      message: `Connected · Model: ${model} · Latency: ${latency}ms`,
+      message: `Connected | Model: ${model} | Latency: ${latency}ms`,
       model,
       latencyMs: latency,
     };
@@ -340,7 +340,7 @@ export class ApiService {
     }
 
     const message = await response.text();
-    throw new Error(`${response.status} ${response.statusText}${message ? ` — ${message}` : ''}`);
+    throw new Error(`${response.status} ${response.statusText}${message ? ` - ${message}` : ''}`);
   }
 
   private toErrorMessage(error: unknown): string {
