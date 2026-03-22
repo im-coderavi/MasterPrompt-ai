@@ -1,8 +1,18 @@
 <svg width="128" height="128" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" rx="14" fill="#11131a"/>
-  <path d="M24 11h16v6h8c4.4 0 8 3.6 8 8v20c0 4.4-3.6 8-8 8H16c-4.4 0-8-3.6-8-8V25c0-4.4 3.6-8 8-8h8z" fill="#5ef2c2"/>
-  <rect x="20" y="26" width="8" height="8" rx="2" fill="#11131a"/>
-  <rect x="36" y="26" width="8" height="8" rx="2" fill="#11131a"/>
-  <rect x="22" y="40" width="20" height="4" rx="2" fill="#11131a"/>
-  <path d="M32 5v6" stroke="#5ef2c2" stroke-width="4" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="pmBg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="pmAccent" x1="16" y1="14" x2="49" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#pmBg)"/>
+  <path d="M24 12h16v6h7c4.418 0 8 3.582 8 8v19c0 4.418-3.582 8-8 8H17c-4.418 0-8-3.582-8-8V26c0-4.418 3.582-8 8-8h7z" fill="url(#pmAccent)"/>
+  <path d="M23 26.5c0-1.381 1.119-2.5 2.5-2.5h2c1.381 0 2.5 1.119 2.5 2.5v2c0 1.381-1.119 2.5-2.5 2.5h-2c-1.381 0-2.5-1.119-2.5-2.5zm11 0c0-1.381 1.119-2.5 2.5-2.5h2c1.381 0 2.5 1.119 2.5 2.5v2c0 1.381-1.119 2.5-2.5 2.5h-2c-1.381 0-2.5-1.119-2.5-2.5z" fill="#0f172a"/>
+  <path d="M22 39c0-1.105.895-2 2-2h16c1.105 0 2 .895 2 2s-.895 2-2 2H24c-1.105 0-2-.895-2-2z" fill="#0f172a"/>
+  <path d="M32 6v6" stroke="#67e8f9" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="32" cy="6" r="2.5" fill="#67e8f9"/>
 </svg>

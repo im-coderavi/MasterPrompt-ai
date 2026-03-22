@@ -83,6 +83,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       case 'openExternal':
         await this.handleOpenExternal(message.payload?.url);
         return;
+      case 'copyToClipboard':
+        await this.handleCopyToClipboard(message.payload?.text);
+        return;
       default:
         return;
     }
@@ -344,6 +347,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async handleCopyToClipboard(text?: string): Promise<void> {
+    if (typeof text !== 'string') {
+      return;
+    }
+
+    await vscode.env.clipboard.writeText(text);
+    this.postMessage({ command: 'clipboardCopied', payload: {} });
+  }
+
   private buildConversationMessages(
     payload: SmartChatRequest,
     settings: ExtensionSettings,
@@ -445,18 +457,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private getHtml(webview: vscode.Webview): string {
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'style.css'));
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'main.js'));
+    const iconUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'robot-icon.svg'));
 
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource}; connect-src https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com http://localhost:11434;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource}; connect-src https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com http://localhost:11434;">
   <link rel="stylesheet" href="${styleUri}">
   <title>PromptMaster AI</title>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app" data-icon-uri="${iconUri}"></div>
   <script src="${scriptUri}"></script>
 </body>
 </html>`;

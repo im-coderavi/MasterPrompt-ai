@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.4] - 2026-03-22
+
+### Fixed
+- Copy actions now fall back to the VS Code clipboard API, so message and code copy works reliably inside the webview.
+
+### Added
+- Added a direct `Clear Chat` action in the Smart Chat view for faster conversation reset.
+
+### Changed
+- Refreshed the sidebar robot icon and reused the packaged asset inside the webview header and empty states.
+- Improved sidebar responsiveness for narrow layouts, including sticky composer behavior, better button wrapping, and safer overflow handling.
+
 ## [1.0.3] - 2026-03-22
 
 ### Fixed

@@ -2,7 +2,7 @@
   "name": "promptmaster-ai",
   "displayName": "PromptMaster AI",
   "description": "A VS Code sidebar assistant with offline prompt enhancement and API-powered smart chat.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "AvishekGiri",
   "engines": {
     "vscode": ">=1.80.0"
